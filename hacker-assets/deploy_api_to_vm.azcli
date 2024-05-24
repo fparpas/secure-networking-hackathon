@@ -1,0 +1,30 @@
+rg='secure-networking-hackathon-demo-cloud' # Add the resource group name
+location='eastus'
+api_vm_name='api-02'
+publisher='kinvolk'
+offer='flatcar-container-linux-free'
+sku='stable-gen2'
+version='latest'
+sql_server_fqdn='10.0.3.4' # Add the address of the SQL server
+sql_username='demouser'
+sql_password='demo!pass123'
+api_image='erjosito/yadaapi:1.0'
+vm_size='Standard_B2s'
+vnet_name='spoke-vnet01' # Add the vnet name
+subnet_name='api' # Add the subnet name
+
+# Accept image terms
+echo "Accepting image terms for $publisher:$offer:$sku..."
+az vm image terms accept -p $publisher -f $offer --plan $sku -o none
+# Cloud init file
+api_cloudinit_file=/tmp/api_cloudinit.txt
+cat <<EOF > $api_cloudinit_file
+#!/bin/bash
+docker run --restart always -d -p 8080:8080 -e "SQL_SERVER_FQDN=$sql_server_fqdn" -e "SQL_SERVER_USERNAME=$sql_username" -e "SQL_SERVER_PASSWORD=$sql_password" --name api $api_image
+EOF
+
+# Create API VM
+echo "Creating API VM..."
+start_time=`date +%s`
+az vm create -n $api_vm_name -g $rg -l $location --image "${publisher}:${offer}:${sku}:${version}" --generate-ssh-keys --size $vm_size \
+   --vnet-name $vnet_name --subnet $subnet_name --custom-data $api_cloudinit_file --security-type Standard --public-ip-address ""  -o none

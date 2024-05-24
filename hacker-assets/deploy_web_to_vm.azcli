@@ -1,0 +1,28 @@
+rg='secure-networking-hackathon-demo-cloud'
+location='eastus'
+web_vm_name='web-02'
+publisher='kinvolk'
+offer='flatcar-container-linux-free'
+sku='stable-gen2'
+version='latest'
+web_image='erjosito/yadaweb:1.0'
+vm_size='Standard_B2s'
+vnet_name='spoke-vnet01'
+subnet_name='web'
+api_private_ip='10.1.13.6'
+
+# Accept image terms
+echo "Accepting image terms for $publisher:$offer:$sku..."
+az vm image terms accept -p $publisher -f $offer --plan $sku -o none
+
+# Cloud init file
+web_cloudinit_file=/tmp/web_cloudinit.txt
+cat <<EOF > $web_cloudinit_file
+#!/bin/bash
+docker run --restart always -d -p 80:80 -e "API_URL=http://${api_private_ip}:8080" --name yadaweb $web_image
+EOF
+# Create Web VM
+echo "Creating Web VM..."
+ az vm create -n $web_vm_name -g $rg -l $location --image "${publisher}:${offer}:${sku}:${version}" --generate-ssh-keys --size $vm_size \
+    --vnet-name $vnet_name --public-ip-address "" --subnet $subnet_name --custom-data $web_cloudinit_file --security-type Standard -o none
+
